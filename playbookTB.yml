@@ -1,0 +1,150 @@
+---
+
+- hosts: all
+  become: true
+  become_user: root
+  tasks:
+    - name: Aktualizacja CentOS v7 to v8
+      yum:
+        name: '*'
+        state: latest
+    - name: 'Stworzenie pliku txt'
+      file:
+        path: "/home/cbstudents/Tomasz_Bochniak.txt"
+        state: touch
+      become: yes
+
+    - name: Check the Uptime
+      shell: uptime
+      register: UPTIME_PRE_REBOOT
+    - debug: msg={{UPTIME_PRE_REBOOT.stdout}}
+
+    - name: Get Uptime Information
+      ansible.builtin.shell: /usr/bin/uptime
+      register: result
+    - name: Show actual date
+      command: date
+    - name: Example from an Ansible Playbook
+      ansible.builtin.ping:
+    - name: Install package baseline
+      yum:
+        name:
+          - bind-utils
+          - net-tools
+          - chrony
+          - ed
+          - yum-utils
+          - vim-enhanced
+          - man-pages
+          - strace
+          - lsof
+          - tcpdump
+          - setroubleshoot-server
+          - setroubleshoot
+          - bash-completion
+        state: latest
+        update_cache: yes
+- hosts: target1
+  become: true
+  become_user: root
+  tasks:
+    - name: latest version of all required packages installed
+      yum:
+        name:
+          - firewalld
+          - httpd
+          - mariadb-server
+          - php
+          - php-mysql
+        state: latest
+    - name: firewalld enabled and running
+      service:
+        name: firewalld
+        enabled: True
+        state: started
+    - name: firewalld permits http service
+      firewalld:
+        service: http
+        permanent: true
+        state: enabled
+        immediate: yes
+    - name: Copy mime.types file
+      copy:
+        src: /etc/mime.types
+        dest: /etc/httpd/conf/mime.types
+        remote_src: yes
+    - name: hhttpd enabled and running
+      service:
+        name: httpd
+        enabled: true
+        state: started
+    - name: copy the php page from remote
+      get_url:
+        url: "https://www.middlewareinventory.com/index.php"
+        dest: /var/www/html/index.php
+        mode: 0644
+    - name: test the webpage/website we have stup
+      uri:
+        url: http://{{ansible_hostname}}/index.php
+        status_code: 200
+    - name: ensure apache is at the latest version
+      yum: pkg=httpd state=latest
+
+
+- hosts: target2
+  become: true
+  become_user: root
+  tasks:
+    - name: Playbook to test the inventory_hostname and ansible_hostname
+      debug: var={{inventory_hostname}}
+    - name: What is my ansible_hostname
+      debug: var={{ansible_hostname}}
+    - name: Install lldpad package
+      yum:
+        name: lldpad
+        state: latest
+    - name: check lldpdad service status
+      service:
+        name: lldpad
+        state: started
+    - name: This is a hello-world
+      copy:
+        content: hellowroldn
+        dest: /tmp/testfile.txt
+    - name: Ensure group "somegroup" exists
+      ansible.builtin.group:
+        name: somegroup
+        state: present
+
+    - name: Ensure group "docker" exists with correct gid
+      ansible.builtin.group:
+        name: docker
+        state: present
+        gid: 1750
+    - name: Asynchronous yum task
+      yum:
+        name: docker-io
+        state: present
+      async: 1000
+      poll: 0
+      register: yum_sleeper
+    - name: Wait for asynchronous job to end
+      async_status:
+       jid: '{{yum_sleeper.ansible_job_id}}'
+      register: job_result
+      until: job_result.finished
+      retries: 100
+      delay: 10
+    - set_stats:
+        data:
+          packages_installed: 31
+        per_host: yes
+    - set_stats:
+        data:
+          one_stat: 11
+    - set_stats:
+        data:
+          the_answer: 42
+        aggregate: no
+    - name: Unconditionally reboot the machine with everything default
+      reboot:
